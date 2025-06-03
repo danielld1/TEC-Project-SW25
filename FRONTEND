@@ -1,0 +1,578 @@
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+
+// Utility for random integer inclusive
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+// Rank mapping
+const CLONE_RANKS = {
+  1: "Cadet",
+  10: "Trooper",
+  20: "Corporal",
+  30: "Sergeant",
+  40: "Lieutenant",
+  50: "Captain",
+  60: "Major",
+  70: "Commander",
+};
+
+// Mission data
+const missionsData = [
+  {
+    title: "Mission 1: Kamino – Final Trial",
+    description: [
+      "CT-1709 'Bunker': Alright cadet, this is your final test. Real weapons. Real stakes.",
+      "ARC Trooper Colt: You will face a gauntlet of droids. No failure. No retreat.",
+    ],
+    waves: 3,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "ARC Commander Colt", hp: 35, attackMin: 6, attackMax: 9 },
+    missionReward: { xp: 20, credits: 20, inventory: ["Clone Cadet Armor"] },
+  },
+  {
+    title: "Mission 2: First Drop – Ryloth Skirmish",
+    description: [
+      "You and your squad are dropped into a Twi'lek village under Separatist attack.",
+      "Twilight skies blaze with laser fire. The villagers are in danger.",
+    ],
+    waves: 2,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Commando Droid Captain", hp: 30, attackMin: 5, attackMax: 8 },
+    missionReward: { xp: 25, credits: 30, inventory: ["Twi'lek Gratitude Token"] },
+  },
+  {
+    title: "Mission 3: Sabotage on Christophis",
+    description: [
+      "You’re inserted into an urban zone with intel on a Separatist bomb.",
+      "CT-42 'Fuse': We've got to find it before half the city goes up!",
+    ],
+    waves: 2,
+    waveEnemy: { name: "B2 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Slicer Droid", hp: 28, attackMin: 4, attackMax: 9 },
+    missionReward: { xp: 25, credits: 35 },
+  },
+  {
+    title: "Mission 4: Ambush in the Crystal Caves",
+    description: [
+      "You accompany Jedi Younglings gathering Kyber crystals on Ilum.",
+      "CT-112 'Flash': It's too quiet down here...",
+    ],
+    waves: 2,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Zharra", hp: 40, attackMin: 5, attackMax: 10 },
+    missionReward: { xp: 30, credits: 40 },
+  },
+  {
+    title: "Mission 5: Shadow Over Kamino",
+    description: [
+      "Separatist boarding pods slam into the cloning facilities.",
+      "You must defend the embryo chambers at all costs!",
+    ],
+    waves: 3,
+    waveEnemy: { name: "Aqua Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Aqua Droid Commander Trask", hp: 45, attackMin: 6, attackMax: 10 },
+    missionReward: { xp: 35, credits: 50 },
+  },
+  {
+    title: "Mission 6: Defense of Raxus Outpost",
+    description: ["You're stationed at a Republic outpost under siege by Separatist forces on Raxus Prime."],
+    waves: 2,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Heavy Droid Tank Juggernaut", hp: 50, attackMin: 7, attackMax: 11 },
+    missionReward: { xp: 40, credits: 50 },
+  },
+  {
+    title: "Mission 7: Cato Neimoidia Heist",
+    description: [
+      "Your squad infiltrates a Banking Clan vault to retrieve stolen Republic funds.",
+      "Stealth fails. Expect heavy resistance.",
+    ],
+    waves: 2,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Neimoidian Assassin Drosk", hp: 38, attackMin: 6, attackMax: 10 },
+    missionReward: { xp: 40, credits: 60 },
+  },
+  {
+    title: "Mission 8: Undercover on Zygerria",
+    description: ["Disguised as a mercenary, you must free enslaved Togrutas without alerting Zygerrian overlords."],
+    waves: 1,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Zygerrian Beastmaster", hp: 42, attackMin: 5, attackMax: 11 },
+    missionReward: { xp: 45, credits: 65 },
+  },
+  {
+    title: "Mission 9: Prison Break – Lola Sayu",
+    description: ["Your mission: rescue clones held in the Citadel prison complex."],
+    waves: 2,
+    waveEnemy: { name: "BX Guardian Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "BX Warden Droid", hp: 45, attackMin: 6, attackMax: 10 },
+    missionReward: { xp: 50, credits: 70 },
+  },
+  {
+    title: "Mission 10: Echoes in the Mines of Kessel",
+    description: ["Clones go missing in the spice mines. You must find out why."],
+    waves: 2,
+    waveEnemy: { name: "Spider Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Hive Queen of Kessel", hp: 50, attackMin: 7, attackMax: 12 },
+    missionReward: { xp: 55, credits: 75 },
+  },
+  {
+    title: "Mission 11: The Jedi Spy",
+    description: ["You track a Jedi Knight suspected of collaborating with the Separatists."],
+    waves: 2,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Rogue Jedi Master Dorrin", hp: 52, attackMin: 7, attackMax: 12 },
+    missionReward: { xp: 55, credits: 80 },
+  },
+  {
+    title: "Mission 12: Treachery on Naboo",
+    description: ["Investigate reports of Separatist sympathizers in the Naboo security forces."],
+    waves: 1,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Clone Traitor CT-480 'Ghost'", hp: 48, attackMin: 6, attackMax: 11 },
+    missionReward: { xp: 60, credits: 85 },
+  },
+  {
+    title: "Mission 13: Black Sun Rising – Mustafar",
+    description: ["Eliminate a Black Sun enforcer manufacturing weapons on Mustafar."],
+    waves: 2,
+    waveEnemy: { name: "B2 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Black Sun Enforcer", hp: 55, attackMin: 7, attackMax: 13 },
+    missionReward: { xp: 65, credits: 90 },
+  },
+  {
+    title: "Mission 14: Nightfall on Umbara",
+    description: ["A stealth assault on Umbara goes wrong. You must lead your squad to regroup."],
+    waves: 2,
+    waveEnemy: { name: "Umbaran Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Umbaran Shadow Walker", hp: 58, attackMin: 8, attackMax: 12 },
+    missionReward: { xp: 70, credits: 95 },
+  },
+  {
+    title: "Mission 15: Ghost Fleet – Anaxes",
+    description: ["Investigate a Republic ship broadcasting a distress beacon from orbit."],
+    waves: 2,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "AI-Overridden Clone Droid", hp: 60, attackMin: 7, attackMax: 13 },
+    missionReward: { xp: 75, credits: 100 },
+  },
+  {
+    title: "Mission 16: Siege of Felucia",
+    description: ["Lead the charge through fungal jungles as Separatists fortify key points."],
+    waves: 3,
+    waveEnemy: { name: "B2 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Prototype AAT Tank", hp: 65, attackMin: 9, attackMax: 14 },
+    missionReward: { xp: 80, credits: 105 },
+  },
+  {
+    title: "Mission 17: Duel on Dathomir",
+    description: ["Hunt down rogue Nightsisters trying to awaken an undead force."],
+    waves: 2,
+    waveEnemy: { name: "Place booby-trapped droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Old Daka", hp: 68, attackMin: 10, attackMax: 15 },
+    missionReward: { xp: 85, credits: 110 },
+  },
+  {
+    title: "Mission 18: Betrayer of Kamino",
+    description: ["Uncover a defector clone who returned to Kamino with stolen intel."],
+    waves: 2,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "CT-223 'Bolt' (Defector)", hp: 72, attackMin: 10, attackMax: 15 },
+    missionReward: { xp: 90, credits: 120 },
+  },
+  {
+    title: "Mission 19: Siege of Coruscant – Part I",
+    description: ["Separatist forces have landed. Defend the city under blackout conditions."],
+    waves: 3,
+    waveEnemy: { name: "B1 Battle Droid", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Grievous Clone", hp: 80, attackMin: 11, attackMax: 16 },
+    missionReward: { xp: 95, credits: 125 },
+  },
+  {
+    title: "Mission 20: Final Mission 20: Operation Shadowfall – Part II",
+    description: ["Infiltrate the Senate bunker and stop Dooku’s hidden apprentice."],
+    waves: 3,
+    waveEnemy: { name: "Elite MagnaGuard", hp: 20, attackMin: 1, attackMax: 4, xpReward: 5, creditReward: 10 },
+    boss: { name: "Darth Veil", hp: 120, attackMin: 13, attackMax: 18 },
+    missionReward: { inventory: [] },
+    finalChoices: [
+      { label: "Comply (Jedi Purge)", xp: 200, credits: 300, inventory: [] },
+      { label: "Resist (Aid Jedi)", xp: 250, credits: 250, inventory: [] },
+      { label: "Hesitate (Disappear)", xp: 150, credits: 150, inventory: [] },
+    ],
+  },
+];
+
+export default function CloneTrooperGame() {
+  const [trooper, setTrooper] = useState(null);
+  const [screen, setScreen] = useState("intro"); // intro, tutorial, mission, epilogue, missionSelect, upgrade
+  const [inputName, setInputName] = useState("");
+  const [currentMissionIdx, setCurrentMissionIdx] = useState(0);
+  const [battleState, setBattleState] = useState(null); // { enemies: [{ name, hp, attackMin, attackMax }], stage: "wave" or "boss" }
+  const [upgradeQueue, setUpgradeQueue] = useState([]); // array of pending upgrades (counts)
+  
+  // Initialize trooper
+  const handleStartGame = () => {
+    const startingTrooper = {
+      name: inputName,
+      battalion: "501st Legion",
+      level: 1,
+      xp: 0,
+      xpNeeded: 10,
+      rank: CLONE_RANKS[1],
+      maxHp: 25,
+      hp: 25,
+      attackMin: 3,
+      attackMax: 6,
+      upgradePoints: 0,
+      specialPower: 1,
+      specialUpgrades: 0,
+      usedSpecial: false,
+      usedHeal: false,
+      credits: 0,
+      inventory: [],
+      weapon: "DC-17 Pistol",
+      armor: "Clone Cadet Armor",
+    };
+    setTrooper(startingTrooper);
+    setScreen("tutorial");
+  };
+
+  // Level up logic
+  const checkLevelUp = (updatedTrooper) => {
+    let t = { ...updatedTrooper };
+    while (t.xp >= t.xpNeeded) {
+      t.xp -= t.xpNeeded;
+      t.level += 1;
+      t.xpNeeded *= 2;
+      t.upgradePoints += 1;
+      t.hp = t.maxHp;
+      if (CLONE_RANKS[t.level]) t.rank = CLONE_RANKS[t.level];
+      
+      // Enqueue an upgrade choice
+      setUpgradeQueue((q) => [...q, 1]);
+    }
+    return t;
+  };
+
+  // Handle awarding XP and Credits, then level up
+  const awardRewards = ({ xp = 0, credits = 0, inventory = [] }) => {
+    setTrooper((prev) => {
+      let updated = { ...prev, xp: prev.xp + xp, credits: prev.credits + credits, inventory: [...prev.inventory, ...inventory] };
+      updated = checkLevelUp(updated);
+      return updated;
+    });
+  };
+
+  // Handle upgrades UI
+  const handleUpgradeChoice = (type) => {
+    setTrooper((prev) => {
+      let t = { ...prev };
+      if (type === 1) {
+        t.maxHp += 5;
+        t.hp = t.maxHp;
+      } else if (type === 2) {
+        t.attackMin += 1;
+        t.attackMax += 1;
+      } else if (type === 3) {
+        t.specialPower += 1;
+        t.specialUpgrades += 1;
+      }
+      t.upgradePoints -= 1;
+      return t;
+    });
+    setUpgradeQueue((q) => q.slice(1));
+  };
+
+  // Battle logic hooks
+  const startBattle = (mission) => {
+    // Initialize wave enemies
+    let wavesLeft = mission.waves;
+    let enemyList = [];
+    // Create wave enemy copies
+    for (let i = 0; i < wavesLeft; i++) {
+      enemyList.push({ ...mission.waveEnemy });
+    }
+    // Then a boss enemy
+    enemyList.push({ ...mission.boss, isBoss: true });
+    setBattleState({ enemies: enemyList, stageIndex: 0, stage: "wave" });
+    setTrooper((prev) => ({ ...prev, usedSpecial: false, usedHeal: false }));
+  };
+
+  const handleAttack = () => {
+    setBattleState((prevState) => {
+      let state = { ...prevState };
+      let currentEnemy = state.enemies[state.stageIndex];
+      // Trooper attacks
+      const dmg = randomInt(trooper.attackMin, trooper.attackMax);
+      currentEnemy.hp -= dmg;
+      if (currentEnemy.hp < 0) currentEnemy.hp = 0;
+      // If enemy dies
+      if (currentEnemy.hp === 0) {
+        // Wave or boss reward
+        if (!currentEnemy.isBoss) {
+          awardRewards({ xp: missionCurrent.waveEnemy.xpReward, credits: missionCurrent.waveEnemy.creditReward });
+          state.stageIndex += 1;
+          // Next stage may be boss or next wave
+          if (state.stageIndex === state.enemies.length - 1) {
+            state.stage = "boss";
+          }
+        } else {
+          // Boss defeated
+          setScreen("postBattle");
+        }
+        return state;
+      }
+      // Enemy attacks back if still alive
+      const ed = randomInt(currentEnemy.attackMin, currentEnemy.attackMax);
+      setTrooper((prev) => {
+        let t = { ...prev, hp: prev.hp - ed };
+        if (t.hp < 0) t.hp = 0;
+        return t;
+      });
+      // Check trooper death
+      if (trooper.hp - ed <= 0) {
+        setScreen("gameOver");
+      }
+      return state;
+    });
+  };
+
+  const handleSpecial = () => {
+    if (trooper.usedSpecial) return;
+    setTrooper((prev) => ({ ...prev, usedSpecial: true }));
+    // Determine damage based on specialUpgrades
+    let dmg = 0;
+    if (trooper.specialUpgrades < 3) dmg = trooper.specialPower * 3;
+    else if (trooper.specialUpgrades < 6) dmg = trooper.specialPower * 5;
+    else dmg = trooper.specialPower * 10;
+    // Apply to current enemy (boss or wave)
+    setBattleState((prevState) => {
+      let state = { ...prevState };
+      let enemy = state.enemies[state.stageIndex];
+      enemy.hp -= dmg;
+      if (enemy.hp < 0) enemy.hp = 0;
+      if (enemy.hp === 0) {
+        if (!enemy.isBoss) {
+          awardRewards({ xp: missionCurrent.waveEnemy.xpReward, credits: missionCurrent.waveEnemy.creditReward });
+          state.stageIndex += 1;
+          if (state.stageIndex === state.enemies.length - 1) state.stage = "boss";
+        } else {
+          setScreen("postBattle");
+        }
+      } else {
+        // Enemy attacks back
+        const ed = randomInt(enemy.attackMin, enemy.attackMax);
+        setTrooper((prev) => {
+          let t = { ...prev, hp: prev.hp - ed };
+          if (t.hp < 0) t.hp = 0;
+          return t;
+        });
+        if (trooper.hp - ed <= 0) setScreen("gameOver");
+      }
+      return state;
+    });
+  };
+
+  const handleHeal = () => {
+    if (trooper.usedHeal) return;
+    setTrooper((prev) => ({ ...prev, usedHeal: true, hp: prev.maxHp }));
+  };
+
+  // References to current mission
+  const missionCurrent = missionsData[currentMissionIdx];
+
+  // Post-battle handling for mission
+  const handlePostBattle = () => {
+    // Award mission reward
+    awardRewards(missionCurrent.missionReward);
+    // Proceed to next mission or epilogue
+    if (currentMissionIdx < missionsData.length - 1) {
+      setCurrentMissionIdx((idx) => idx + 1);
+      setScreen("mission");
+    } else {
+      setScreen("epilogue");
+    }
+  };
+
+  // For mission 20 final choice
+  const handleFinalChoice = (choice) => {
+    const rewards = missionCurrent.finalChoices[choice];
+    awardRewards(rewards);
+    setScreen("epilogue");
+  };
+
+  // Render functions
+  const renderIntro = () => (
+    <Card className="max-w-md mx-auto mt-10">
+      <CardContent className="space-y-4">
+        <h2 className="text-xl font-bold">Welcome, Clone Cadet</h2>
+        <input
+          type="text"
+          placeholder="Enter your name"
+          value={inputName}
+          onChange={(e) => setInputName(e.target.value)}
+          className="w-full border p-2 rounded"
+        />
+        <Button onClick={handleStartGame} disabled={!inputName}>Start Game</Button>
+      </CardContent>
+    </Card>
+  );
+
+  const renderTutorial = () => (
+    <Card className="max-w-md mx-auto mt-10">
+      <CardContent className="space-y-4">
+        <h2 className="text-xl font-bold">Tutorial: First Encounter</h2>
+        <p>A training droid activates. Engage!</p>
+        <Button onClick={() => startBattle({
+          waves: 1,
+          waveEnemy: { name: "Training Droid", hp: 5, attackMin: 1, attackMax: 2, xpReward: 5, creditReward: 0 },
+          boss: { name: "Training Droid", hp: 0 },
+          missionReward: { xp: 0, credits: 0 }
+        })}>Begin Tutorial</Button>
+      </CardContent>
+    </Card>
+  );
+
+  const renderStats = () => {
+    if (!trooper) return null;
+    return (
+      <Card className="max-w-md mx-auto mt-4">
+        <CardContent className="space-y-2">
+          <h3 className="font-semibold">{trooper.name}'s Stats</h3>
+          <p>Level: {trooper.level} | XP: {trooper.xp}/{trooper.xpNeeded}</p>
+          <p>Rank: {trooper.rank}</p>
+          <p>HP: {trooper.hp}/{trooper.maxHp}</p>
+          <p>Attack: {trooper.attackMin}-{trooper.attackMax}</p>
+          <p>Special Power: {trooper.specialPower}</p>
+          <p>Credits: {trooper.credits}</p>
+          <p>Weapon: {trooper.weapon}</p>
+          <p>Armor: {trooper.armor}</p>
+          <p>Inventory: {trooper.inventory.join(", ")}</p>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderBattle = () => {
+    if (!battleState) return null;
+    const currentEnemy = battleState.enemies[battleState.stageIndex];
+    return (
+      <Card className="max-w-md mx-auto mt-10">
+        <CardContent className="space-y-4">
+          <h2 className="text-xl font-bold">{currentEnemy.isBoss ? "Boss Encounter" : currentEnemy.name}</h2>
+          <p>Enemy HP: {currentEnemy.hp}</p>
+          <div className="space-x-2">
+            <Button onClick={handleAttack}>Attack</Button>
+            <Button variant="outline" onClick={handleSpecial} disabled={trooper.usedSpecial}>Special</Button>
+            <Button variant="secondary" onClick={handleHeal} disabled={trooper.usedHeal}>Heal</Button>
+          </div>
+          <p>Your HP: {trooper.hp}</p>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderMission = () => {
+    // If battle not started, show briefing
+    if (!battleState) {
+      return (
+        <Card className="max-w-md mx-auto mt-10">
+          <CardContent className="space-y-4">
+            <h2 className="text-xl font-bold">{missionCurrent.title}</h2>
+            {missionCurrent.description.map((line, idx) => (
+              <p key={idx}>{line}</p>
+            ))}
+            <Button onClick={() => startBattle(missionCurrent)}>Start Mission</Button>
+          </CardContent>
+        </Card>
+      );
+    }
+    return renderBattle();
+  };
+
+  const renderPostBattle = () => (
+    <Card className="max-w-md mx-auto mt-10">
+      <CardContent className="space-y-4">
+        <h2 className="text-xl font-bold">Mission Complete!</h2>
+        <Button onClick={handlePostBattle}>Proceed</Button>
+      </CardContent>
+    </Card>
+  );
+
+  const renderFinalChoice = () => (
+    <Card className="max-w-md mx-auto mt-10">
+      <CardContent className="space-y-4">
+        <h2 className="text-xl font-bold">Final Choice</h2>
+        {missionCurrent.finalChoices.map((choiceObj, idx) => (
+          <Button key={idx} onClick={() => handleFinalChoice(idx)}>{choiceObj.label}</Button>
+        ))}
+      </CardContent>
+    </Card>
+  );
+
+  const renderEpilogue = () => (
+    <Card className="max-w-md mx-auto mt-10">
+      <CardContent className="space-y-4">
+        <h2 className="text-xl font-bold">Epilogue: Echoes of War</h2>
+        <p>The war rages on. But you, trooper, helped turn the tide.</p>
+        <p>Your name will be remembered among the ranks of the finest.</p>
+        <p>This chapter ends... but another awaits.</p>
+        <Button onClick={() => setScreen("missionSelect")}>Mission Select</Button>
+      </CardContent>
+    </Card>
+  );
+
+  const renderMissionSelect = () => (
+    <Card className="max-w-md mx-auto mt-10">
+      <CardContent className="space-y-4">
+        <h2 className="text-xl font-bold">Mission Replay Menu</h2>
+        {missionsData.slice(0, 20).map((m, idx) => (
+          <Button key={idx} onClick={() => { setCurrentMissionIdx(idx); setBattleState(null); setScreen("mission"); }}>{`Mission ${idx + 1}`}</Button>
+        ))}
+      </CardContent>
+    </Card>
+  );
+
+  const renderUpgrade = () => (
+    <Card className="max-w-md mx-auto mt-10">
+      <CardContent className="space-y-4">
+        <h2 className="text-xl font-bold">Upgrade Unlocked!</h2>
+        <p>Choose an upgrade:</p>
+        <div className="space-x-2">
+          <Button onClick={() => handleUpgradeChoice(1)}>Increase Max HP (+5)</Button>
+          <Button onClick={() => handleUpgradeChoice(2)}>Increase Attack (+1)</Button>
+          <Button onClick={() => handleUpgradeChoice(3)}>Improve Special Ability (+1)</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderGameOver = () => (
+    <Card className="max-w-md mx-auto mt-10 bg-red-100">
+      <CardContent className="space-y-4">
+        <h2 className="text-xl font-bold text-red-600">Game Over</h2>
+        <Button onClick={() => window.location.reload()}>Restart</Button>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-4">
+      {screen === "intro" && renderIntro()}
+      {trooper && renderStats()}
+      {screen === "tutorial" && renderTutorial()}
+      {(screen === "mission" && renderMission())}
+      {screen === "postBattle" && (
+        currentMissionIdx === missionsData.length - 1
+        ? renderFinalChoice()
+        : renderPostBattle()
+      )}
+      {screen === "epilogue" && renderEpilogue()}
+      {screen === "missionSelect" && renderMissionSelect()}
+      {screen === "upgrade" && renderUpgrade()}
+      {screen === "gameOver" && renderGameOver()}
+    </div>
+  );
+}
