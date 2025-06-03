@@ -1,0 +1,1401 @@
+# --- Expanded Story Missions and Game Logic ---
+import random
+
+# --- Ranks by Level ---
+CLONE_RANKS = {
+    1: "Cadet", 10: "Trooper", 20: "Corporal", 30: "Sergeant",
+    40: "Lieutenant", 50: "Captain", 60: "Major", 70: "Commander"
+}
+
+# --- CloneTrooper Class ---
+class CloneTrooper:
+    def __init__(self, name, battalion):
+        self.name = name
+        self.battalion = battalion
+        self.level = 1
+        self.xp = 0
+        self.xp_needed = 10
+        self.rank = CLONE_RANKS[1]
+        self.max_hp = 25
+        self.hp = self.max_hp
+        self.attack_min = 3
+        self.attack_max = 6
+        self.upgrade_points = 0
+        self.special_power = 1
+        self.special_upgrades = 0
+        self.used_special_this_battle = False
+        self.used_heal_this_battle = False
+        self.credits = 0
+        self.inventory = []
+        self.weapon = "DC-17 Pistol"
+        self.armor = "Clone Cadet Armor"
+
+    def show_stats(self):
+        print(f"\n--- {self.name}'s Stats ---")
+        print(f"Level: {self.level} | XP: {self.xp}/{self.xp_needed}")
+        print(f"Rank: {self.rank}")
+        print(f"HP: {self.hp}/{self.max_hp}")
+        print(f"Attack: {self.attack_min}-{self.attack_max}")
+        print(f"Special Power: {self.special_power}")
+        print(f"Credits: {self.credits}")
+        print(f"Weapon: {self.weapon}")
+        print(f"Armor: {self.armor}")
+        print(f"Inventory: {self.inventory}")
+
+    def gain_xp(self, amount):
+        self.xp += amount
+        print(f"You gained {amount} XP! Total XP: {self.xp}/{self.xp_needed}")
+        while self.xp >= self.xp_needed:
+            self.xp -= self.xp_needed
+            self.level_up()
+
+    def level_up(self):
+        self.level += 1
+        self.xp_needed *= 2
+        self.upgrade_points += 1
+        self.hp = self.max_hp
+        if self.level in CLONE_RANKS:
+            self.rank = CLONE_RANKS[self.level]
+        print(f"\n--- Level Up! You reached level {self.level} ---")
+        print(f"New Rank: {self.rank}")
+        print(f"Upgrade Point earned! Total: {self.upgrade_points}")
+        self.use_upgrade()
+
+    def use_upgrade(self):
+        while self.upgrade_points > 0:
+            print("\nUpgrade Options:")
+            print("1. Increase Max HP (+5)")
+            print("2. Increase Attack (+1 to both min and max)")
+            print("3. Improve Special Ability (+1)")
+            choice = input("Choose upgrade (1-3): ").strip()
+            if choice == "1":
+                self.max_hp += 5
+                print("Max HP increased!")
+            elif choice == "2":
+                self.attack_min += 1
+                self.attack_max += 1
+                print("Attack increased!")
+            elif choice == "3":
+                self.special_power += 1
+                self.special_upgrades += 1
+                print("Special ability increased!")
+            else:
+                print("Invalid choice. Try again.")
+                continue
+            self.upgrade_points -= 1
+
+    def attack(self):
+        return random.randint(self.attack_min, self.attack_max)
+
+    def take_damage(self, amount):
+        self.hp -= amount
+        if self.hp < 0:
+            self.hp = 0
+
+    def is_alive(self):
+        return self.hp > 0
+
+    def reset_battle_flags(self):
+        self.used_special_this_battle = False
+        self.used_heal_this_battle = False
+
+    def heal(self):
+        if self.used_heal_this_battle:
+            print("You've already used your heal this battle!")
+            return False
+        self.hp = self.max_hp
+        self.used_heal_this_battle = True
+        print(f"\nYou used a medpack! HP fully restored to {self.hp}.")
+        return True
+
+    def use_special_ability(self, enemies):
+        if self.used_special_this_battle:
+            print("You've already used your special ability this battle!")
+            return
+        self.used_special_this_battle = True
+        if self.special_upgrades < 3:
+            damage = self.special_power * 3
+            print(f"\nYou throw a Thermal Grenade! It explodes for {damage} damage!")
+            enemies[0]["hp"] -= damage
+        elif self.special_upgrades < 6:
+            damage = self.special_power * 5
+            print(f"\nYou call in an Airstrike! Each enemy takes {damage} damage!")
+            for enemy in enemies:
+                enemy["hp"] -= damage
+        else:
+            damage = self.special_power * 10
+            print(f"\nOrbital Strike incoming! {damage} damage to every target!")
+            for enemy in enemies:
+                enemy["hp"] -= damage
+
+# --- Battle Function ---
+def battle_droid_fight(trooper):
+    droid = {"hp": 10}
+    trooper.reset_battle_flags()
+    print(f"\n{trooper.name}, a B1 Battle Droid approaches!\n")
+    while trooper.is_alive() and droid["hp"] > 0:
+        print("\nYour options: [Enter] attack | 'special' use ability | 'heal' use medpack | 'inv' to view inventory")
+        action = input("Choose action: ").strip().lower()
+        if action == "inv" or action == "inventory":
+            trooper.show_stats()
+            continue
+        elif action == "special":
+            trooper.use_special_ability([droid])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            damage = trooper.attack()
+            droid["hp"] -= damage
+            print(f"You hit the droid for {damage} damage! Droid HP: {max(droid['hp'], 0)}")
+        if droid["hp"] <= 0:
+            print("The droid is destroyed!")
+            trooper.gain_xp(5)
+            trooper.credits += 10
+            print("You earned 10 credits!")
+            break
+        droid_damage = random.randint(1, 4)
+        trooper.take_damage(droid_damage)
+        print(f"The droid fires back! You take {droid_damage} damage. Your HP: {max(trooper.hp, 0)}")
+    if not trooper.is_alive():
+        print("\nYou were defeated in battle... Game Over.")
+        return False
+    return True
+
+# --- Shop Function ---
+def visit_shop(trooper):
+    print("\n--- Clone Armory & Weapons Depot ---")
+    while True:
+        print(f"\nYou have {trooper.credits} credits.")
+        print("Type 'inv' to view inventory or choose a number to purchase:")
+        shop_items = [
+            ("DC-15S Carbine", 20, lambda t: (setattr(t, 'attack_min', t.attack_min+1), setattr(t, 'attack_max', t.attack_max+1), setattr(t, 'weapon', 'DC-15S Carbine'))),
+            ("Phase I Armor", 20, lambda t: (setattr(t, 'max_hp', t.max_hp+5), setattr(t, 'hp', t.max_hp), setattr(t, 'armor', 'Phase I Armor'))),
+            ("DC-15A Blaster", 40, lambda t: (setattr(t, 'attack_min', t.attack_min+2), setattr(t, 'attack_max', t.attack_max+2), setattr(t, 'weapon', 'DC-15A Blaster'))),
+            ("Phase II Armor", 40, lambda t: (setattr(t, 'max_hp', t.max_hp+10), setattr(t, 'hp', t.max_hp), setattr(t, 'armor', 'Phase II Armor'))),
+            ("Z-6 Rotary Blaster", 70, lambda t: (setattr(t, 'attack_min', t.attack_min+3), setattr(t, 'attack_max', t.attack_max+3), setattr(t, 'weapon', 'Z-6 Rotary Blaster'))),
+            ("ARC Trooper Armor", 70, lambda t: (setattr(t, 'max_hp', t.max_hp+15), setattr(t, 'hp', t.max_hp), setattr(t, 'attack_min', t.attack_min+1), setattr(t, 'attack_max', t.attack_max+1), setattr(t, 'armor', 'ARC Trooper Armor')))
+        ]
+        for i, (name, cost, _) in enumerate(shop_items):
+            print(f"{i+1}. {name} - {cost} credits")
+        print(f"{len(shop_items)+1}. Exit Shop")
+        choice = input("Choose an option or type 'inv': ").strip().lower()
+        if choice == "inv":
+            trooper.show_stats()
+            continue
+        if choice.isdigit():
+            index = int(choice) - 1
+            if index < 0 or index >= len(shop_items):
+                print("Exiting shop.")
+                break
+            item_name, item_cost, effect_fn = shop_items[index]
+            if item_name in trooper.inventory:
+                print("You already own this item.")
+                continue
+            if trooper.credits >= item_cost:
+                effect_fn(trooper)
+                trooper.credits -= item_cost
+                trooper.inventory.append(item_name)
+                print(f"{item_name} purchased!")
+            else:
+                print("Not enough credits!")
+        else:
+            print("Invalid input.")
+
+# --- Missions 1–20, already defined ---
+# (Assume `mission_1` through `mission_20` are defined elsewhere)
+
+# --- Game Start and Mission Loop ---
+def get_name():
+    return input("Clone Trooper, what is your name? ").strip()
+
+def choose_battalion():
+    print("Choose your battalion:")
+    print("1. 501st Legion\n2. 212th Attack Battalion\n3. 104th Wolfpack")
+    battalions = {
+        "1": "501st Legion",
+        "2": "212th Attack Battalion",
+        "3": "104th Wolfpack"
+    }
+# --- Expanded Story Missions and Game Logic ---
+
+import random
+
+# --- Ranks by Level ---
+CLONE_RANKS = {
+    1: "Cadet", 10: "Trooper", 20: "Corporal", 30: "Sergeant",
+    40: "Lieutenant", 50: "Captain", 60: "Major", 70: "Commander"
+}
+
+# --- CloneTrooper Class ---
+class CloneTrooper:
+    def __init__(self, name, battalion):
+        self.name = name
+        self.battalion = battalion
+        self.level = 1
+        self.xp = 0
+        self.xp_needed = 10
+        self.rank = CLONE_RANKS[1]
+        self.max_hp = 20
+        self.hp = self.max_hp
+        self.attack_min = 3
+        self.attack_max = 6
+        self.upgrade_points = 0
+        self.special_power = 1
+        self.special_upgrades = 0
+        self.used_special_this_battle = False
+        self.used_heal_this_battle = False
+        self.credits = 0
+        self.inventory = []
+        self.weapon = "DC-17 Pistol"
+        self.armor = "Clone Cadet Armor"
+
+    def show_stats(self):
+        print(f"\n--- {self.name}'s Stats ---")
+        print(f"Level: {self.level} | XP: {self.xp}/{self.xp_needed}")
+        print(f"Rank: {self.rank}")
+        print(f"HP: {self.hp}/{self.max_hp}")
+        print(f"Attack: {self.attack_min}-{self.attack_max}")
+        print(f"Special Power: {self.special_power}")
+        print(f"Credits: {self.credits}")
+        print(f"Weapon: {self.weapon}")
+        print(f"Armor: {self.armor}")
+        print(f"Inventory: {self.inventory}")
+
+    def gain_xp(self, amount):
+        self.xp += amount
+        print(f"You gained {amount} XP! Total XP: {self.xp}/{self.xp_needed}")
+        while self.xp >= self.xp_needed:
+            self.xp -= self.xp_needed
+            self.level_up()
+
+    def level_up(self):
+        self.level += 1
+        self.xp_needed *= 2
+        self.upgrade_points += 1
+        self.hp = self.max_hp
+        if self.level in CLONE_RANKS:
+            self.rank = CLONE_RANKS[self.level]
+        print(f"\n--- Level Up! You reached level {self.level} ---")
+        print(f"New Rank: {self.rank}")
+        print(f"Upgrade Point earned! Total: {self.upgrade_points}")
+        self.use_upgrade()
+
+    def use_upgrade(self):
+        while self.upgrade_points > 0:
+            print("\nUpgrade Options:")
+            print("1. Increase Max HP (+5)")
+            print("2. Increase Attack (+1 to both min and max)")
+            print("3. Improve Special Ability (+1)")
+            choice = input("Choose upgrade (1-3): ").strip()
+            if choice == "1":
+                self.max_hp += 5
+                print("Max HP increased!")
+            elif choice == "2":
+                self.attack_min += 1
+                self.attack_max += 1
+                print("Attack increased!")
+            elif choice == "3":
+                self.special_power += 1
+                self.special_upgrades += 1
+                print("Special ability increased!")
+            else:
+                print("Invalid choice. Try again.")
+                continue
+            self.upgrade_points -= 1
+
+    def attack(self):
+        return random.randint(self.attack_min, self.attack_max)
+
+    def take_damage(self, amount):
+        self.hp -= amount
+        if self.hp < 0:
+            self.hp = 0
+
+    def is_alive(self):
+        return self.hp > 0
+
+    def reset_battle_flags(self):
+        self.used_special_this_battle = False
+        self.used_heal_this_battle = False
+
+    def heal(self):
+        if self.used_heal_this_battle:
+            print("You've already used your heal this battle!")
+            return False
+        self.hp = self.max_hp
+        self.used_heal_this_battle = True
+        print(f"\nYou used a medpack! HP fully restored to {self.hp}.")
+        return True
+
+    def use_special_ability(self, enemies):
+        if self.used_special_this_battle:
+            print("You've already used your special ability this battle!")
+            return
+        self.used_special_this_battle = True
+        if self.special_upgrades < 3:
+            damage = self.special_power * 3
+            print(f"\nYou throw a Thermal Grenade! It explodes for {damage} damage!")
+            for enemy in enemies:
+                if enemy["hp"] > 0:
+                    enemy["hp"] -= damage
+        elif self.special_upgrades < 6:
+            damage = self.special_power * 5
+            print(f"\nYou call in an Airstrike! Each enemy takes {damage} damage!")
+            for enemy in enemies:
+                if enemy["hp"] > 0:
+                    enemy["hp"] -= damage
+        else:
+            damage = self.special_power * 10
+            print(f"\nOrbital Strike incoming! {damage} damage to every target!")
+            for enemy in enemies:
+                if enemy["hp"] > 0:
+                    enemy["hp"] -= damage
+
+
+# --- Battle Function ---
+def battle_droid_fight(trooper):
+    droid = {"hp": 20}
+    trooper.reset_battle_flags()
+    print(f"\n{trooper.name}, a B1 Battle Droid approaches!\n")
+    while trooper.is_alive() and droid["hp"] > 0:
+        print("\nYour options: [Enter] attack | 'special' use ability | 'heal' use medpack | 'inv' to view inventory")
+        action = input("Choose action: ").strip().lower()
+        if action == "inv" or action == "inventory":
+            trooper.show_stats()
+            continue
+        elif action == "special":
+            trooper.use_special_ability([droid])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            damage = trooper.attack()
+            droid["hp"] -= damage
+            print(f"You hit the droid for {damage} damage! Droid HP: {max(droid['hp'], 0)}")
+        if droid["hp"] <= 0:
+            print("The droid is destroyed!")
+            trooper.gain_xp(5)
+            trooper.credits += 10
+            print("You earned 10 credits!")
+            break
+        if droid["hp"] > 0: # Only if droid is still alive
+            droid_damage = random.randint(1, 4)
+            trooper.take_damage(droid_damage)
+            print(f"The droid fires back! You take {droid_damage} damage. Your HP: {max(trooper.hp, 0)}")
+    if not trooper.is_alive():
+        print("\nYou were defeated in battle... Game Over.")
+        return False
+    return True
+
+
+# --- Shop Function ---
+def visit_shop(trooper):
+    print("\n--- Clone Armory & Weapons Depot ---")
+    while True:
+        print(f"\nYou have {trooper.credits} credits.")
+        print("Type 'inv' to view inventory or choose a number to purchase:")
+        shop_items = [
+            ("DC-15S Carbine", 20, lambda t: (setattr(t, 'attack_min', t.attack_min+1), setattr(t, 'attack_max', t.attack_max+1), setattr(t, 'weapon', 'DC-15S Carbine'))),
+            ("Phase I Armor", 20, lambda t: (setattr(t, 'max_hp', t.max_hp+5), setattr(t, 'hp', t.max_hp), setattr(t, 'armor', 'Phase I Armor'))),
+            ("DC-15A Blaster", 40, lambda t: (setattr(t, 'attack_min', t.attack_min+2), setattr(t, 'attack_max', t.attack_max+2), setattr(t, 'weapon', 'DC-15A Blaster'))),
+            ("Phase II Armor", 40, lambda t: (setattr(t, 'max_hp', t.max_hp+10), setattr(t, 'hp', t.max_hp), setattr(t, 'armor', 'Phase II Armor'))),
+            ("Z-6 Rotary Blaster", 70, lambda t: (setattr(t, 'attack_min', t.attack_min+3), setattr(t, 'attack_max', t.attack_max+3), setattr(t, 'weapon', 'Z-6 Rotary Blaster'))),
+            ("ARC Trooper Armor", 70, lambda t: (setattr(t, 'max_hp', t.max_hp+15), setattr(t, 'hp', t.max_hp), setattr(t, 'attack_min', t.attack_min+1), setattr(t, 'attack_max', t.attack_max+1), setattr(t, 'armor', 'ARC Trooper Armor')))
+        ]
+        for i, (name, cost, _) in enumerate(shop_items):
+            print(f"{i+1}. {name} - {cost} credits")
+        print(f"{len(shop_items)+1}. Exit Shop")
+        choice = input("Choose an option or type 'inv': ").strip().lower()
+        if choice == "inv":
+            trooper.show_stats()
+            continue
+        if choice.isdigit():
+            index = int(choice) - 1
+            if index < 0 or index >= len(shop_items):
+                print("Exiting shop.")
+                break
+            item_name, item_cost, effect_fn = shop_items[index]
+            if item_name in trooper.inventory:
+                print("You already own this item.")
+                continue
+            if trooper.credits >= item_cost:
+                effect_fn(trooper)
+                trooper.credits -= item_cost
+                trooper.inventory.append(item_name)
+                print(f"{item_name} purchased!")
+            else:
+                print("Not enough credits!")
+        else:
+            print("Invalid input.")
+
+# --- Missions 1–20, already defined ---
+# (Assume `mission_1` through `mission_20` are defined elsewhere)
+
+# --- Game Start and Mission Loop ---
+def get_name():
+    return input("Clone Trooper, what is your name? ").strip()
+
+def choose_battalion():
+    print("Choose your battalion:")
+    print("1. 501st Legion\n2. 212th Attack Battalion\n3. 104th Wolfpack")
+    battalions = {
+        "1": "501st Legion",
+        "2": "212th Attack Battalion",
+        "3": "104th Wolfpack"
+    }
+    return battalions.get(input("Enter 1, 2, or 3: ").strip(), "501st Legion")
+
+# --- Expanded Story Missions and Game Logic ---
+import random
+
+# --- Ranks by Level ---
+CLONE_RANKS = {
+    1: "Cadet", 10: "Trooper", 20: "Corporal", 30: "Sergeant",
+    40: "Lieutenant", 50: "Captain", 60: "Major", 70: "Commander"
+}
+
+# --- CloneTrooper Class ---
+class CloneTrooper:
+    def __init__(self, name, battalion):
+        self.name = name
+        self.battalion = battalion
+        self.level = 1
+        self.xp = 0
+        self.xp_needed = 10
+        self.rank = CLONE_RANKS[1]
+        self.max_hp = 20
+        self.hp = self.max_hp
+        self.attack_min = 3
+        self.attack_max = 6
+        self.upgrade_points = 0
+        self.special_power = 1
+        self.special_upgrades = 0
+        self.used_special_this_battle = False
+        self.used_heal_this_battle = False
+        self.credits = 0
+        self.inventory = []
+        self.weapon = "DC-17 Pistol"
+        self.armor = "Clone Cadet Armor"
+
+    def show_stats(self):
+        print(f"\n--- {self.name}'s Stats ---")
+        print(f"Level: {self.level} | XP: {self.xp}/{self.xp_needed}")
+        print(f"Rank: {self.rank}")
+        print(f"HP: {self.hp}/{self.max_hp}")
+        print(f"Attack: {self.attack_min}-{self.attack_max}")
+        print(f"Special Power: {self.special_power}")
+        print(f"Credits: {self.credits}")
+        print(f"Weapon: {self.weapon}")
+        print(f"Armor: {self.armor}")
+        print(f"Inventory: {self.inventory}")
+
+    def gain_xp(self, amount):
+        self.xp += amount
+        print(f"You gained {amount} XP! Total XP: {self.xp}/{self.xp_needed}")
+        while self.xp >= self.xp_needed:
+            self.xp -= self.xp_needed
+            self.level_up()
+
+    def level_up(self):
+        self.level += 1
+        self.xp_needed *= 2
+        self.upgrade_points += 1
+        self.hp = self.max_hp
+        if self.level in CLONE_RANKS:
+            self.rank = CLONE_RANKS[self.level]
+        print(f"\n--- Level Up! You reached level {self.level} ---")
+        print(f"New Rank: {self.rank}")
+        print(f"Upgrade Point earned! Total: {self.upgrade_points}")
+        self.use_upgrade()
+
+    def use_upgrade(self):
+        while self.upgrade_points > 0:
+            print("\nUpgrade Options:")
+            print("1. Increase Max HP (+5)")
+            print("2. Increase Attack (+1 to both min and max)")
+            print("3. Improve Special Ability (+1)")
+            choice = input("Choose upgrade (1-3): ").strip()
+            if choice == "1":
+                self.max_hp += 5
+                print("Max HP increased!")
+            elif choice == "2":
+                self.attack_min += 1
+                self.attack_max += 1
+                print("Attack increased!")
+            elif choice == "3":
+                self.special_power += 1
+                self.special_upgrades += 1
+                print("Special ability increased!")
+            else:
+                print("Invalid choice. Try again.")
+                continue
+            self.upgrade_points -= 1
+
+    def attack(self):
+        return random.randint(self.attack_min, self.attack_max)
+
+    def take_damage(self, amount):
+        self.hp -= amount
+        if self.hp < 0:
+            self.hp = 0
+
+    def is_alive(self):
+        return self.hp > 0
+
+    def reset_battle_flags(self):
+        self.used_special_this_battle = False
+        self.used_heal_this_battle = False
+
+    def heal(self):
+        if self.used_heal_this_battle:
+            print("You've already used your heal this battle!")
+            return False
+        self.hp = self.max_hp
+        self.used_heal_this_battle = True
+        print(f"\nYou used a medpack! HP fully restored to {self.hp}.")
+        return True
+
+    def use_special_ability(self, enemies):
+        if self.used_special_this_battle:
+            print("You've already used your special ability this battle!")
+            return
+        self.used_special_this_battle = True
+        if self.special_upgrades < 3:
+            damage = self.special_power * 3
+            print(f"\nYou throw a Thermal Grenade! It explodes for {damage} damage!")
+            for enemy in enemies:
+                if enemy["hp"] > 0:
+                    enemy["hp"] -= damage
+        elif self.special_upgrades < 6:
+            damage = self.special_power * 5
+            print(f"\nYou call in an Airstrike! Each enemy takes {damage} damage!")
+            for enemy in enemies:
+                if enemy["hp"] > 0:
+                    enemy["hp"] -= damage
+        else:
+            damage = self.special_power * 10
+            print(f"\nOrbital Strike incoming! {damage} damage to every target!")
+            for enemy in enemies:
+                if enemy["hp"] > 0:
+                    enemy["hp"] -= damage
+
+
+# --- Battle Function ---
+def battle_droid_fight(trooper):
+    droid = {"hp": 20}
+    trooper.reset_battle_flags()
+    print(f"\n{trooper.name}, a B1 Battle Droid approaches!\n")
+    while trooper.is_alive() and droid["hp"] > 0:
+        print("\nYour options: [Enter] attack | 'special' use ability | 'heal' use medpack | 'inv' to view inventory")
+        action = input("Choose action: ").strip().lower()
+        if action == "inv" or action == "inventory":
+            trooper.show_stats()
+            continue
+        elif action == "special":
+            trooper.use_special_ability([droid])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            damage = trooper.attack()
+            droid["hp"] -= damage
+            print(f"You hit the droid for {damage} damage! Droid HP: {max(droid['hp'], 0)}")
+        if droid["hp"] <= 0:
+            print("The droid is destroyed!")
+            trooper.gain_xp(5)
+            trooper.credits += 10
+            print("You earned 10 credits!")
+            break
+        if droid["hp"] > 0: # Only if droid is still alive
+            droid_damage = random.randint(1, 4)
+            trooper.take_damage(droid_damage)
+            print(f"The droid fires back! You take {droid_damage} damage. Your HP: {max(trooper.hp, 0)}")
+    if not trooper.is_alive():
+        print("\nYou were defeated in battle... Game Over.")
+        return False
+    return True
+
+def tutorial_battle(trooper):
+    print("\n--- Tutorial: First Encounter ---")
+    print("A training droid is activated. Engage!")
+    tutorial_droid = {"hp": 5}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and tutorial_droid["hp"] > 0:
+        print("\nYour options: [Enter] attack | 'special' use ability | 'heal' use medpack")
+        action = input("Choose action: ").strip().lower()
+        if action == "heal":
+            trooper.use_special_ability([tutorial_droid])
+        elif action == "special":
+            trooper.heal()
+        else:
+            damage = trooper.attack()
+            tutorial_droid["hp"] -= damage
+            print(f"You hit the training droid for {damage} damage! Droid HP: {max(tutorial_droid['hp'], 0)}")
+        if tutorial_droid["hp"] <= 0:
+            print("Training droid disabled. Good work, Cadet!")
+            trooper.gain_xp(5)
+            break
+        if tutorial_droid["hp"] > 0:
+            droid_damage = random.randint(1, 2)
+            trooper.take_damage(droid_damage)
+            print(f"The droid fires back! You take {droid_damage} damage. Your HP: {max(trooper.hp, 0)}")
+    if not trooper.is_alive():
+        print("\nTutorial failed... Try again, Trooper.")
+        return False
+    return True
+
+
+# --- Shop Function ---
+def visit_shop(trooper):
+    print("\n--- Clone Armory & Weapons Depot ---")
+    while True:
+        print(f"\nYou have {trooper.credits} credits.")
+        print("Type 'inv' to view inventory or choose a number to purchase:")
+        shop_items = [
+            ("DC-15S Carbine", 20, lambda t: (setattr(t, 'attack_min', t.attack_min+1), setattr(t, 'attack_max', t.attack_max+1), setattr(t, 'weapon', 'DC-15S Carbine'))),
+            ("Phase I Armor", 20, lambda t: (setattr(t, 'max_hp', t.max_hp+5), setattr(t, 'hp', t.max_hp), setattr(t, 'armor', 'Phase I Armor'))),
+            ("DC-15A Blaster", 40, lambda t: (setattr(t, 'attack_min', t.attack_min+2), setattr(t, 'attack_max', t.attack_max+2), setattr(t, 'weapon', 'DC-15A Blaster'))),
+            ("Phase II Armor", 40, lambda t: (setattr(t, 'max_hp', t.max_hp+10), setattr(t, 'hp', t.max_hp), setattr(t, 'armor', 'Phase II Armor'))),
+            ("Z-6 Rotary Blaster", 70, lambda t: (setattr(t, 'attack_min', t.attack_min+3), setattr(t, 'attack_max', t.attack_max+3), setattr(t, 'weapon', 'Z-6 Rotary Blaster'))),
+            ("ARC Trooper Armor", 70, lambda t: (setattr(t, 'max_hp', t.max_hp+15), setattr(t, 'hp', t.max_hp), setattr(t, 'attack_min', t.attack_min+1), setattr(t, 'attack_max', t.attack_max+1), setattr(t, 'armor', 'ARC Trooper Armor')))
+        ]
+        for i, (name, cost, _) in enumerate(shop_items):
+            print(f"{i+1}. {name} - {cost} credits")
+        print(f"{len(shop_items)+1}. Exit Shop")
+        choice = input("Choose an option or type 'inv': ").strip().lower()
+        if choice == "inv":
+            trooper.show_stats()
+            continue
+        if choice.isdigit():
+            index = int(choice) - 1
+            if index < 0 or index >= len(shop_items):
+                print("Exiting shop.")
+                break
+            item_name, item_cost, effect_fn = shop_items[index]
+            if item_name in trooper.inventory:
+                print("You already own this item.")
+                continue
+            if trooper.credits >= item_cost:
+                effect_fn(trooper)
+                trooper.credits -= item_cost
+                trooper.inventory.append(item_name)
+                print(f"{item_name} purchased!")
+            else:
+                print("Not enough credits!")
+        else:
+            print("Invalid input.")
+
+# --- Missions 1–20, already defined ---
+# (Assume `mission_1` through `mission_20` are defined elsewhere)
+
+# --- Game Start and Mission Loop ---
+def get_name():
+    return input("Clone Trooper, what is your name? ").strip()
+
+def choose_battalion():
+    print("Choose your battalion:")
+    print("1. 501st Legion\n2. 212th Attack Battalion\n3. 104th Wolfpack")
+    battalions = {
+        "1": "501st Legion",
+        "2": "212th Attack Battalion",
+        "3": "104th Wolfpack"
+    }
+    return battalions.get(input("Enter 1, 2, or 3: ").strip(), "501st Legion")
+
+
+
+def mission_1(trooper):
+    print("\n--- Mission 1: Kamino – Final Trial ---")
+    print("CT-1709 'Bunker': Alright cadet, this is your final test. Real weapons. Real stakes.")
+    print("ARC Trooper Colt (via intercom): You will face a gauntlet of droids. No failure. No retreat.")
+    for i in range(3):
+        print(f"\nWave {i+1} incoming!")
+        if not battle_droid_fight(trooper):
+            return
+    print("\nSimulated Boss Encounter: ARC Commander Colt")
+    boss = {"name": "ARC Commander Colt", "hp": 35, "attack_min": 6, "attack_max": 9}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You hit {boss['name']} for {dmg} damage! HP left: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("You bested ARC Commander Colt! Graduation complete.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"{boss['name']} counters for {boss_dmg} damage! Your HP: {trooper.hp}")
+    if trooper.is_alive():
+        print("\nMission Complete! You've passed your final cadet trial.")
+        trooper.gain_xp(20)
+        trooper.credits += 20
+        trooper.inventory.append("Clone Cadet Armor")
+
+def mission_2(trooper):
+    print("\n--- Mission 2: First Drop – Ryloth Skirmish ---")
+    print("You and your squad are dropped into a Twi'lek village under Separatist attack.")
+    print("Twilight skies blaze with laser fire. The villagers are in danger.")
+    for i in range(2):
+        print(f"\nSkirmish {i+1} in the village square!")
+        if not battle_droid_fight(trooper):
+            return
+    print("\nBoss Encounter: BX Commando Droid Captain")
+    boss = {"name": "Commando Droid Captain", "hp": 30, "attack_min": 5, "attack_max": 8}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You hit {boss['name']} for {dmg} damage! HP left: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("You eliminated the Commando Droid Captain. The village is safe.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"{boss['name']} strikes for {boss_dmg} damage! Your HP: {trooper.hp}")
+    if trooper.is_alive():
+        print("\nMission Complete! You’ve secured your first victory on the frontlines.")
+        trooper.gain_xp(25)
+        trooper.credits += 30
+        trooper.inventory.append("Twi'lek Gratitude Token")
+
+def mission_3(trooper):
+    print("\n--- Mission 3: Sabotage on Christophis ---")
+    print("You’re inserted into an urban zone with intel on a Separatist bomb.")
+    print("CT-42 'Fuse': We've got to find it before half the city goes up!")
+    print("You battle B2 droids while scanning for the device.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("\nBoss Encounter: Techno Union Slicer Droid")
+    boss = {"name": "Slicer Droid", "hp": 28, "attack_min": 4, "attack_max": 9}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You damage {boss['name']} for {dmg}. Remaining HP: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("You disable the bomb and the slicer unit. City is safe.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"{boss['name']} launches a virus pulse: You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("\nMission Complete! Christophis thanks you.")
+        trooper.gain_xp(25)
+        trooper.credits += 35
+
+def mission_4(trooper):
+    print("\n--- Mission 4: Ambush in the Crystal Caves ---")
+    print("You accompany Jedi Younglings gathering Kyber crystals on Ilum.")
+    print("CT-112 'Flash': It's too quiet down here...")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("\nBoss Encounter: Dark Acolyte Zharra")
+    boss = {"name": "Zharra", "hp": 40, "attack_min": 5, "attack_max": 10}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"Hit! {boss['name']} takes {dmg} damage. HP left: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("You repel the dark side influence. The Younglings are safe.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Zharra hurls Force lightning! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("\nMission Complete! The Force is with you.")
+        trooper.gain_xp(30)
+        trooper.credits += 40
+
+def mission_5(trooper):
+    print("\n--- Mission 5: Shadow Over Kamino ---")
+    print("Separatist boarding pods slam into the cloning facilities.")
+    print("You must defend the embryo chambers at all costs!")
+    for i in range(3):
+        if not battle_droid_fight(trooper):
+            return
+    print("\nBoss Encounter: Aqua Droid Commander Trask")
+    boss = {"name": "Trask", "hp": 45, "attack_min": 6, "attack_max": 10}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You strike Trask for {dmg}! Remaining HP: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("You neutralized Trask. Kamino is defended.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Trask smashes into you for {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("\nMission Complete! You are now a veteran of Kamino’s defense.")
+        trooper.gain_xp(35)
+        trooper.credits += 50
+
+def mission_6(trooper):
+    print("\n--- Mission 6: Defense of Raxus Outpost ---")
+    print("You're stationed at a Republic outpost under siege by Separatist forces on Raxus Prime.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("\nBoss Encounter: Heavy Droid Tank 'Juggernaut'")
+    boss = {"name": "Juggernaut", "hp": 50, "attack_min": 7, "attack_max": 11}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You hit Juggernaut for {dmg} damage! HP left: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Juggernaut destroyed. Raxus outpost is secure.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Juggernaut fires! You take {boss_dmg} damage! HP: {trooper.hp}")
+    if trooper.is_alive():
+        print("\nMission Complete! You're now a defender of Raxus Prime.")
+        trooper.gain_xp(40)
+        trooper.credits += 50
+
+def mission_7(trooper):
+    print("\n--- Mission 7: Cato Neimoidia Heist ---")
+    print("Your squad infiltrates a Banking Clan vault to retrieve stolen Republic funds.")
+    print("Stealth fails. Expect heavy resistance.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("\nBoss Encounter: Neimoidian Assassin Drosk")
+    boss = {"name": "Drosk", "hp": 38, "attack_min": 6, "attack_max": 10}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You strike Drosk for {dmg}. Remaining HP: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Funds secured. Drosk is eliminated.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Drosk slashes! You take {boss_dmg} damage! HP: {trooper.hp}")
+    if trooper.is_alive():
+        print("\nMission Complete! Vault data retrieved.")
+        trooper.gain_xp(40)
+        trooper.credits += 60
+
+def mission_8(trooper):
+    print("\n--- Mission 8: Undercover on Zygerria ---")
+    print("Disguised as a mercenary, you must free enslaved Togrutas without alerting Zygerrian overlords.")
+    for i in range(1):
+        if not battle_droid_fight(trooper):
+            return
+    print("\nBoss Encounter: Zygerrian Warden & Beast")
+    boss = {"name": "Zygerrian Beastmaster", "hp": 42, "attack_min": 5, "attack_max": 11}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You hit the Beastmaster for {dmg}. Remaining HP: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Togrutas freed. Zygerrian hold broken.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"The beast lunges! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("\nMission Complete! You kept your cover and saved innocents.")
+        trooper.gain_xp(45)
+        trooper.credits += 65
+
+def mission_9(trooper):
+    print("\n--- Mission 9: Prison Break – Lola Sayu ---")
+    print("Your mission: rescue clones held in the Citadel prison complex.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("\nBoss Encounter: BX Warden Droid + Snipers")
+    boss = {"name": "Warden Droid", "hp": 45, "attack_min": 6, "attack_max": 10}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You land a shot! {boss['name']} HP: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("The Citadel security is down. Clones liberated.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Warden fires stun beams! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("\nMission Complete! You survived the Citadel.")
+        trooper.gain_xp(50)
+        trooper.credits += 70
+
+def mission_10(trooper):
+    print("\n--- Mission 10: Echoes in the Mines of Kessel ---")
+    print("Clones go missing in the spice mines. You must find out why.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("\nBoss Encounter: Hive Queen of Kessel")
+    boss = {"name": "Hive Queen", "hp": 50, "attack_min": 7, "attack_max": 12}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"Queen shrieks as you hit for {dmg}! HP: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Queen slain. Missing troopers avenged.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Hive Queen claws you! Damage: {boss_dmg}")
+    if trooper.is_alive():
+        print("\nMission Complete! Kessel’s mines are cleared.")
+        trooper.gain_xp(55)
+        trooper.credits += 75
+
+
+def mission_11(trooper):
+    print("--- Mission 11: The Jedi Spy ---")
+    print("You track a Jedi Knight suspected of collaborating with the Separatists.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("Boss Encounter: Rogue Jedi Master Dorrin")
+    boss = {"name": "Dorrin", "hp": 52, "attack_min": 7, "attack_max": 12}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You clash lightsaber-to-blaster: {dmg} damage! HP left: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Dorrin is disarmed and captured.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Force push! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("Mission Complete! Betrayal exposed.")
+        trooper.gain_xp(55)
+        trooper.credits += 80
+
+def mission_12(trooper):
+    print("--- Mission 12: Treachery on Naboo ---")
+    print("Investigate reports of Separatist sympathizers in the Naboo security forces.")
+    for i in range(1):
+        if not battle_droid_fight(trooper):
+            return
+    print("Boss Encounter: Clone Traitor CT-480 'Ghost'")
+    boss = {"name": "Ghost", "hp": 48, "attack_min": 6, "attack_max": 11}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"Blaster duel: you hit Ghost for {dmg}. HP: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Ghost is defeated. His betrayal dies with him.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Ghost counters! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("Mission Complete! Naboo is safe.")
+        trooper.gain_xp(60)
+        trooper.credits += 85
+
+def mission_13(trooper):
+    print("--- Mission 13: Black Sun Rising – Mustafar ---")
+    print("Eliminate a Black Sun enforcer manufacturing weapons on Mustafar.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("Boss Encounter: Black Sun Enforcer")
+    boss = {"name": "Flame Enforcer", "hp": 55, "attack_min": 7, "attack_max": 13}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You blast the enforcer for {dmg}. HP left: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Weapon production shut down.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Flame shot! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("Mission Complete! Mustafar’s factories silenced.")
+        trooper.gain_xp(65)
+        trooper.credits += 90
+
+def mission_14(trooper):
+    print("--- Mission 14: Nightfall on Umbara ---")
+    print("A stealth assault on Umbara goes wrong. You must lead your squad to regroup.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("Boss Encounter: Umbaran Shadow Walker")
+    boss = {"name": "Shadow Walker", "hp": 58, "attack_min": 8, "attack_max": 12}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"The shadows scream as you deal {dmg}. HP left: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Shadow Walker defeated. Umbara darkens no more.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Blinding strike! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("Mission Complete! You led your squad to safety.")
+        trooper.gain_xp(70)
+        trooper.credits += 95
+
+def mission_15(trooper):
+    print("--- Mission 15: Ghost Fleet – Anaxes ---")
+    print("Investigate a Republic ship broadcasting a distress beacon from orbit.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("Boss Encounter: AI-Overridden Clone Droid")
+    boss = {"name": "Rogue AI Unit", "hp": 60, "attack_min": 7, "attack_max": 13}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You disable systems! {dmg} damage. Remaining HP: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("AI neutralized. The ghost fleet is safe.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Electrical surge! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("Mission Complete! Anaxes is clear.")
+        trooper.gain_xp(75)
+        trooper.credits += 100
+
+def mission_16(trooper):
+    print("--- Mission 16: Siege of Felucia ---")
+    print("Lead the charge through fungal jungles as Separatists fortify key points.")
+    for i in range(3):
+        if not battle_droid_fight(trooper):
+            return
+    print("Boss Encounter: Prototype AAT Tank")
+    boss = {"name": "AAT Tank", "hp": 65, "attack_min": 9, "attack_max": 14}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"Direct hit on tank hull: {dmg} damage! Tank HP: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Tank destroyed. Felucia front collapses.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Heavy cannon strike! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("Mission Complete! Felucia is ours.")
+        trooper.gain_xp(80)
+        trooper.credits += 105
+
+def mission_17(trooper):
+    print("--- Mission 17: Duel on Dathomir ---")
+    print("Hunt down rogue Nightsisters trying to awaken an undead force.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("Boss Encounter: Spirit of Old Daka")
+    boss = {"name": "Old Daka", "hp": 68, "attack_min": 10, "attack_max": 15}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You strike the spirit for {dmg} damage! HP left: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Daka’s spirit dissipates.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Dark magic blast! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("Mission Complete! The dead sleep once more.")
+        trooper.gain_xp(85)
+        trooper.credits += 110
+
+def mission_18(trooper):
+    print("--- Mission 18: Betrayer of Kamino ---")
+    print("Uncover a defector clone who returned to Kamino with stolen intel.")
+    for i in range(2):
+        if not battle_droid_fight(trooper):
+            return
+    print("Boss Encounter: CT-223 'Bolt' (Defector)")
+    boss = {"name": "Bolt", "hp": 72, "attack_min": 10, "attack_max": 15}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"Bolt absorbs a hit: {dmg} damage! HP left: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Bolt defeated. Intel recovered.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Blaster strike from cover! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("Mission Complete! Kamino’s security restored.")
+        trooper.gain_xp(90)
+        trooper.credits += 120
+
+def mission_19(trooper):
+    print("--- Mission 19: Siege of Coruscant – Part I ---")
+    print("Separatist forces have landed. Defend the city under blackout conditions.")
+    for i in range(3):
+        if not battle_droid_fight(trooper):
+            return
+    print("Boss Encounter: Cyborg Clone ‘Grievous Unit’")
+    boss = {"name": "Grievous Clone", "hp": 80, "attack_min": 11, "attack_max": 16}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Action [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"Mechanical limbs spark as you hit for {dmg}. HP left: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Grievous Clone shutdown.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Whirring blade slash! You take {boss_dmg} damage!")
+    if trooper.is_alive():
+        print("Mission Complete! Inner city is secure.")
+        trooper.gain_xp(95)
+        trooper.credits += 125
+
+def mission_20(trooper):
+    print("--- Final Mission 20: Operation Shadowfall – Part II ---")
+    print("Infiltrate the Senate bunker and stop Dooku’s hidden apprentice.")
+
+    print("Phase 1: Fight through elite MagnaGuards.")
+    for i in range(3):
+        if not battle_droid_fight(trooper):
+            return
+
+    print("Phase 2: Boss – Darth Veil")
+    boss = {"name": "Darth Veil", "hp": 120, "attack_min": 13, "attack_max": 18}
+    trooper.reset_battle_flags()
+    while trooper.is_alive() and boss["hp"] > 0:
+        action = input("Final Battle [Enter=Attack | 'special' | 'heal']: ").strip().lower()
+        if action == "special":
+            trooper.use_special_ability([boss])
+        elif action == "heal":
+            trooper.heal()
+        else:
+            dmg = trooper.attack()
+            boss["hp"] -= dmg
+            print(f"You strike Veil: {dmg} damage. HP: {max(boss['hp'], 0)}")
+        if boss["hp"] <= 0:
+            print("Veil crumbles in defeat. Shadowfall is stopped.")
+            break
+        boss_dmg = random.randint(boss["attack_min"], boss["attack_max"])
+        trooper.take_damage(boss_dmg)
+        print(f"Force-charged saber slash! You take {boss_dmg} damage!")
+
+    if not trooper.is_alive():
+        return
+
+    print("As the smoke clears, you receive a comm: 'Execute Order 66.'")
+    print("You feel something stir inside you...")
+    choice = input("Do you comply with Order 66? [yes/no]: ").strip().lower()
+
+    if choice == "yes":
+        print("You comply. The Jedi are marked for extinction. You assist in the purge of the Jedi Temple.")
+        print("Victory is swift, brutal... and hollow. The galaxy is changed forever.")
+        trooper.gain_xp(200)
+        trooper.credits += 300
+    elif choice == "no":
+        print("You resist. You warn the Jedi and help them escape.")
+        print("Now marked as a traitor, you flee with a small band of survivors.")
+        print("You fight not for the Republic... but for what's right.")
+        trooper.gain_xp(250)
+        trooper.credits += 250
+    else:
+        print("Hesitation costs you everything. Both sides turn against you. You vanish into the shadows.")
+        trooper.gain_xp(150)
+        trooper.credits += 150
+
+def mission_21(trooper):
+    print("--- Epilogue: Echoes of War ---")
+    print("The war rages on. But you, trooper, helped turn the tide.")
+    print("Your name will be remembered among the ranks of the finest.")
+    print("This chapter ends... but another awaits.")
+
+MISSION_FUNCTIONS = [
+    mission_1, mission_2, mission_3, mission_4, mission_5,
+    mission_6, mission_7, mission_8, mission_9, mission_10,
+    mission_11, mission_12, mission_13, mission_14, mission_15,
+    mission_16, mission_17, mission_18, mission_19, mission_20, mission_21
+]
+def mission_select(trooper):
+    missions = [
+        mission_1, mission_2, mission_3, mission_4, mission_5,
+        mission_6, mission_7, mission_8, mission_9, mission_10,
+        mission_11, mission_12, mission_13, mission_14, mission_15,
+        mission_16, mission_17, mission_18, mission_19, mission_20
+    ]
+
+    while True:
+        print("\n--- Mission Replay Menu ---")
+        for i in range(len(missions)):
+            print(f"{i+1}. Replay Mission {i+1}")
+        print("0. Exit")
+
+        choice = input("Select a mission number to replay (1–20): ").strip()
+        if choice == "0":
+            break
+        elif choice.isdigit() and 1 <= int(choice) <= 20:
+            selected = missions[int(choice)-1]
+            selected(trooper)
+        else:
+            print("Invalid selection. Try again.")
+
+
+
+def start_game():
+    name = get_name()
+    battalion = choose_battalion()
+    trooper = CloneTrooper(name, battalion)
+
+    print(f"\nWelcome, Clone Trooper {trooper.name} of the {trooper.battalion}!\n")
+    tutorial_battle(trooper)
+
+    # Sequential playthrough
+    for i in range(1, 21):
+        globals()[f"place_m{i}"](trooper)
+        if not trooper.is_alive():
+            print("You must heal and restart to continue.")
+            return
+
+    mission_21()
+
+    # Post-game replay
+    print("\n--- CAMPAIGN COMPLETE ---")
+    print("You may now replay any mission using the Mission Select menu.\n")
+    mission_select(trooper)
+
+
+# --- Launch Game ---
+if __name__ == "__main__":
+    start_game()
